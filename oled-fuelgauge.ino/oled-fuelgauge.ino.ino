@@ -10,7 +10,7 @@ void lowPower() {
 
 // LiFuelGauge constructor parameters
 // 1. IC type, MAX17043 or MAX17044
-// 2. Number of interrupt to which the alert pin is associated (Optional) 
+// 2. Number of interrupt to which the alert pin is associated (Optional)
 // 3. ISR to call when an alert interrupt is generated (Optional)
 //
 // Creates a LiFuelGauge instance for the MAX17043 IC
@@ -26,7 +26,7 @@ unsigned long time;
 const int SCREEN_HEIGHT = 32;
 const int SCREEN_WIDTH = 128;
 const int NUM_MEASUREMENTS = 12;
-const long READ_INTERVAL = 1000L * 60L * 5L;
+const long READ_INTERVAL = 1000L * 60L * 5L / 120L; //TODO: remove 120L here
 
 const int analogInPin = A0;
 const int transistorPin = 4;
@@ -42,15 +42,15 @@ void setup(void) {
   delay(200);  // Waits for the initial measurements to be made
 }
 
-void drawMeasurements(int plotX, int plotY, int plotWidth, int plotHeight){
+void drawMeasurements(int plotX, int plotY, int plotWidth, int plotHeight) {
   const int BAR_WIDTH = (int)(plotWidth / NUM_MEASUREMENTS);
-  
+
   for (int i = 0; i < NUM_MEASUREMENTS; i++) {
-    if (y[i] != -1){
+    if (y[i] != -1) {
       u8g2.drawBox(
-        plotX + (NUM_MEASUREMENTS - i - 1) * BAR_WIDTH, 
-        plotHeight - y[i], 
-        BAR_WIDTH - 2, 
+        plotX + (NUM_MEASUREMENTS - i - 1) * BAR_WIDTH,
+        plotHeight - y[i],
+        BAR_WIDTH - 2,
         plotHeight
       );
     } else {
@@ -59,45 +59,52 @@ void drawMeasurements(int plotX, int plotY, int plotWidth, int plotHeight){
   }
 }
 
+int freeRam () {
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+ 
 void drawBattery(int screenHeight, int batteryWidth, int batteryLevelHeight) {
-  u8g2.drawBox(3,0,4,2); //Battery knob
-  u8g2.drawFrame(0,2,batteryWidth,screenHeight - 2); //Battery frame
+  u8g2.drawBox(3, 0, 4, 2); //Battery knob
+  u8g2.drawFrame(0, 2, batteryWidth, screenHeight - 2); //Battery frame
   int batteryLevelPixels = (int)(gauge.getSOC() / 100 * batteryLevelHeight);
-  u8g2.drawBox(2,4 + batteryLevelHeight - batteryLevelPixels,batteryWidth - 4, batteryLevelPixels);
+  u8g2.drawBox(2, 4 + batteryLevelHeight - batteryLevelPixels, batteryWidth - 4, batteryLevelPixels);
 }
 
 void measureMoisture() {
-  digitalWrite(transistorPin, HIGH);   
-  delay(500);                  
+  digitalWrite(transistorPin, HIGH);
+  delay(500);
   analogInValue = analogRead(analogInPin);
-  digitalWrite(transistorPin, LOW);    
+  digitalWrite(transistorPin, LOW);
 
-  for (int k = NUM_MEASUREMENTS; k >= 0; k--){   
-    y[k]=y[k-1];
+  for (int k = NUM_MEASUREMENTS; k >= 0; k--) {
+    y[k] = y[k - 1];
   }
-  //y[0] = map(analogInValue, 0, 1023, 0, SCREEN_HEIGHT);
-  y[0] = map((int)gauge.getSOC(), 0, 100, 0, SCREEN_HEIGHT);
+  y[0] = map(analogInValue, 0, 1023, 0, SCREEN_HEIGHT);
+  //y[0] = map((int)gauge.getSOC(), 0, 100, 0, SCREEN_HEIGHT);
 }
 
 void loop(void) {
   time = millis();
   //if (y[0] < 1 || time > 1000L * 60L * 60L) {
-    measureMoisture();
-    time = 0L;
+  measureMoisture();
+  time = 0L;
   //}
-  
+
   u8g2.firstPage();
   do {
     u8g2.setFont(u8g_font_unifont);
     drawBattery(32, 10, 26);
     drawMeasurements(15, 0, SCREEN_WIDTH - 15, SCREEN_HEIGHT);
     char result[8]; // Buffer big enough for 7-character float
-    dtostrf(gauge.getVoltage(), 6, 2, result); // Leave room for too large numbers!
-    u8g2.drawStr(12,16, result);
+    //dtostrf(gauge.getVoltage(), 6, 2, result); // Leave room for too large numbers!
+    itoa(freeRam(), result, 10);
+    u8g2.drawStr(12, 16, result);
     dtostrf(gauge.getSOC(), 6, 2, result); // Leave room for too large numbers!
-    u8g2.drawStr(12,32, result);
-  } while( u8g2.nextPage() );
-  
+    u8g2.drawStr(12, 32, result);
+  } while ( u8g2.nextPage() );
+
   // rebuild the picture after some delay
   delay(READ_INTERVAL);
 }
